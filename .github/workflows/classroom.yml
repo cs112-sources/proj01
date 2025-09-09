@@ -64,22 +64,23 @@ jobs:
         echo "| Test | Status | Score |" >> $GITHUB_STEP_SUMMARY
         echo "|------|--------|-------|" >> $GITHUB_STEP_SUMMARY
         
-        # Function to process test results
+        # POSIX-compliant function to process test results
         process_result() {
-          local test_name="$1"
-          local result="$2"
-          local icon="❌"
-          local status="FAILED"
-          
-          if [[ "$result" == *"✓"* ]] || [[ "$result" == "success" ]]; then
-            icon="✅"
-            status="PASSED"
-          fi
-          
-          echo "| $test_name | $icon $status | $(echo "$result" | grep -o '[0-9]\+/[0-9]\+' || echo '0/1') |" >> $GITHUB_STEP_SUMMARY
+          test_name="$1"
+          result="$2"
+          icon="❌"
+          status="FAILED"
+          case "$result" in
+            *✓*|success)
+              icon="✅"
+              status="PASSED"
+              ;;
+          esac
+          score=$(echo "$result" | grep -o '[0-9]\+/[0-9]\+' || echo '0/1')
+          echo "| $test_name | $icon $status | $score |" >> "$GITHUB_STEP_SUMMARY"
         }
-        
-        # Process each test
+
+        # Process each test (no arrays)
         process_result "compile via make" "${{ steps.compile-make.outputs.result }}"
         process_result "step1" "${{ steps.step1.outputs.result }}"
         process_result "step2" "${{ steps.step2.outputs.result }}"
@@ -94,29 +95,61 @@ jobs:
         echo "║            Test Results                ║" >> $GITHUB_STEP_SUMMARY
         echo "╠════════════════════════════════════════╣" >> $GITHUB_STEP_SUMMARY
         
-        # ASCII results
-        tests=("compile-make" "step1" "step2" "step3" "step4")
-        test_names=("compile via make" "step1" "step2" "step3" "step4")
-        
-        for i in "${!tests[@]}"; do
-          test_id="${tests[$i]}"
-          test_name="${test_names[$i]}"
-          
-          # Get the result using indirect variable reference
-          case "$test_id" in
-            "compile-make") result="${{ steps.compile-make.outputs.result }}" ;;
-            "step1") result="${{ steps.step1.outputs.result }}" ;;
-            "step2") result="${{ steps.step2.outputs.result }}" ;;
-            "step3") result="${{ steps.step3.outputs.result }}" ;;
-            "step4") result="${{ steps.step4.outputs.result }}" ;;
-          esac
-          
-          if [[ "$result" == *"✓"* ]] || [[ "$result" == "success" ]]; then
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> $GITHUB_STEP_SUMMARY
-          else
-            printf "║ %-30s [FAIL] ║\n" "$test_name" >> $GITHUB_STEP_SUMMARY
-          fi
-        done
+        # ASCII results (no arrays, just repeat for each test)
+        test_name="compile via make"
+        result="${{ steps.compile-make.outputs.result }}"
+        case "$result" in
+          *✓*|success)
+            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          *)
+            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+        esac
+
+        test_name="step1"
+        result="${{ steps.step1.outputs.result }}"
+        case "$result" in
+          *✓*|success)
+            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          *)
+            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+        esac
+
+        test_name="step2"
+        result="${{ steps.step2.outputs.result }}"
+        case "$result" in
+          *✓*|success)
+            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          *)
+            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+        esac
+
+        test_name="step3"
+        result="${{ steps.step3.outputs.result }}"
+        case "$result" in
+          *✓*|success)
+            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          *)
+            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+        esac
+
+        test_name="step4"
+        result="${{ steps.step4.outputs.result }}"
+        case "$result" in
+          *✓*|success)
+            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          *)
+            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+        esac
         
         echo "╚════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
