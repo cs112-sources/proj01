@@ -1,0 +1,122 @@
+name: Autograding Tests
+'on':
+- push
+- repository_dispatch
+- workflow_dispatch
+permissions:
+  checks: write
+  actions: read
+  contents: read
+jobs:
+  run-autograding-tests:
+    runs-on: ubuntu-latest
+    container:
+      image: calvincsinfrastructure/devcontainer-cs112-autograde:latest
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: compile via make
+      id: compile-make
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: compile
+        setup-command: make
+        command: test -f tester
+        timeout: 4
+        max-score: 0
+    - name: step1
+      id: step1
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: step1
+        command: "./tester step1"
+        timeout: 10
+        max-score: 1
+    - name: step2
+      id: step2
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: step2
+        command: "./tester step2"
+        timeout: 10
+        max-score: 1
+    - name: step3
+      id: step3
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: step3
+        command: "./tester step3"
+        timeout: 10
+        max-score: 1
+    - name: step4
+      id: step4
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: step4
+        command: "./tester step4"
+        timeout: 10
+        max-score: 1
+    - name: Create Summary
+      id: summary
+      run: |
+        echo "## Autograding Results" >> $GITHUB_STEP_SUMMARY
+        echo "| Test | Status | Score |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        
+        # Function to process test results
+        process_result() {
+          local test_name="$1"
+          local result="$2"
+          local icon="❌"
+          local status="FAILED"
+          
+          if [[ "$result" == *"✓"* ]] || [[ "$result" == "success" ]]; then
+            icon="✅"
+            status="PASSED"
+          fi
+          
+          echo "| $test_name | $icon $status | $(echo "$result" | grep -o '[0-9]\+/[0-9]\+' || echo '0/1') |" >> $GITHUB_STEP_SUMMARY
+        }
+        
+        # Process each test
+        process_result "compile via make" "${{ steps.compile-make.outputs.result }}"
+        process_result "step1" "${{ steps.step1.outputs.result }}"
+        process_result "step2" "${{ steps.step2.outputs.result }}"
+        process_result "step3" "${{ steps.step3.outputs.result }}"
+        process_result "step4" "${{ steps.step4.outputs.result }}"
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "╔════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
+        echo "║            Test Results                ║" >> $GITHUB_STEP_SUMMARY
+        echo "╠════════════════════════════════════════╣" >> $GITHUB_STEP_SUMMARY
+        
+        # ASCII results
+        tests=("compile-make" "step1" "step2" "step3" "step4")
+        test_names=("compile via make" "step1" "step2" "step3" "step4")
+        
+        for i in "${!tests[@]}"; do
+          test_id="${tests[$i]}"
+          test_name="${test_names[$i]}"
+          
+          # Get the result using indirect variable reference
+          case "$test_id" in
+            "compile-make") result="${{ steps.compile-make.outputs.result }}" ;;
+            "step1") result="${{ steps.step1.outputs.result }}" ;;
+            "step2") result="${{ steps.step2.outputs.result }}" ;;
+            "step3") result="${{ steps.step3.outputs.result }}" ;;
+            "step4") result="${{ steps.step4.outputs.result }}" ;;
+          esac
+          
+          if [[ "$result" == *"✓"* ]] || [[ "$result" == "success" ]]; then
+            printf "║ %-30s [PASS] ║\n" "$test_name" >> $GITHUB_STEP_SUMMARY
+          else
+            printf "║ %-30s [FAIL] ║\n" "$test_name" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+        
+        echo "╚════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
