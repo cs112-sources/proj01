@@ -133,17 +133,38 @@ jobs:
               *)    status="⚠️ Unknown" ;;
             esac
 
-            # For compile test, show a student-friendly message
-            if [ "$name" = "compile" ]; then
-              if [ "$raw" = "pass" ]; then
-                message="Compiled successfully."
-              else
-                # If message is empty, show a generic error
-                if [ -z "$message" ]; then
-                  message="Compilation failed."
+            # Student-friendly messages for each test
+            case "$name" in
+              compile)
+                if [ "$raw" = "pass" ]; then
+                  message="Compiled successfully."
+                else
+                  if [ -z "$message" ]; then
+                    message="Compilation failed. Please check your code for syntax errors and required files."
+                  fi
                 fi
-              fi
-            fi
+                ;;
+              step1)
+                if [ "$raw" = "fail" ] && [ -z "$message" ]; then
+                  message="Step 1 failed. Check your implementation and output format."
+                fi
+                ;;
+              step2)
+                if [ "$raw" = "fail" ] && [ -z "$message" ]; then
+                  message="Step 2 failed. Review your logic and output for this step."
+                fi
+                ;;
+              step3)
+                if [ "$raw" = "fail" ] && [ -z "$message" ]; then
+                  message="Step 3 failed. Make sure your code meets the requirements."
+                fi
+                ;;
+              step4)
+                if [ "$raw" = "fail" ] && [ -z "$message" ]; then
+                  message="Step 4 failed. Double-check your solution and output."
+                fi
+                ;;
+            esac
 
             # keep the table intact
             message="${message//|/\\|}"
