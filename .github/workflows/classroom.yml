@@ -1,8 +1,8 @@
 name: Autograding Tests
-'on':
-- push
-- repository_dispatch
-- workflow_dispatch
+on:
+  push:
+  workflow_dispatch:
+  repository_dispatch:
 permissions:
   checks: write
   actions: read
@@ -10,152 +10,205 @@ permissions:
 jobs:
   run-autograding-tests:
     runs-on: ubuntu-latest
-    container:
-      image: calvincsinfrastructure/devcontainer-cs112-autograde:latest
-    if: github.actor != 'github-classroom[bot]'
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: compile via make
-      id: compile-make
-      uses: classroom-resources/autograding-command-grader@v1
-      with:
-        test-name: compile
-        setup-command: make
-        command: test -f tester
-        timeout: 4
-        max-score: 0
-    - name: step1
-      id: step1
-      uses: classroom-resources/autograding-command-grader@v1
-      with:
-        test-name: step1
-        command: "./tester step1"
-        timeout: 10
-        max-score: 1
-    - name: step2
-      id: step2
-      uses: classroom-resources/autograding-command-grader@v1
-      with:
-        test-name: step2
-        command: "./tester step2"
-        timeout: 10
-        max-score: 1
-    - name: step3
-      id: step3
-      uses: classroom-resources/autograding-command-grader@v1
-      with:
-        test-name: step3
-        command: "./tester step3"
-        timeout: 10
-        max-score: 1
-    - name: step4
-      id: step4
-      uses: classroom-resources/autograding-command-grader@v1
-      with:
-        test-name: step4
-        command: "./tester step4"
-        timeout: 10
-        max-score: 1
-    - name: Create Summary
-      id: summary
-      env:
-        COMPILE_RESULT: ${{ steps.compile-make.outputs.result }}
-        STEP1_RESULT: ${{ steps.step1.outputs.result }}
-        STEP2_RESULT: ${{ steps.step2.outputs.result }}
-        STEP3_RESULT: ${{ steps.step3.outputs.result }}
-        STEP4_RESULT: ${{ steps.step4.outputs.result }}
-      run: |
-        echo "## Autograding Results" >> $GITHUB_STEP_SUMMARY
-        echo "| Test | Status | Score |" >> $GITHUB_STEP_SUMMARY
-        echo "|------|--------|-------|" >> $GITHUB_STEP_SUMMARY
-        
-        # POSIX-compliant function to process test results
-        process_result() {
-          test_name="$1"
-          result="$2"
-          icon="❌"
-          status="FAILED"
-          case "$result" in
-            *✓*|success)
-              icon="✅"
-              status="PASSED"
-              ;;
-          esac
-          score=$(echo "$result" | grep -o '[0-9]\+/[0-9]\+' || echo '0/1')
-          echo "| $test_name | $icon $status | $score |" >> "$GITHUB_STEP_SUMMARY"
-        }
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        # Process each test (no arrays)
-        process_result "compile via make" "$COMPILE_RESULT"
-        process_result "step1" "$STEP1_RESULT"
-        process_result "step2" "$STEP2_RESULT"
-        process_result "step3" "$STEP3_RESULT"
-        process_result "step4" "$STEP4_RESULT"
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential
 
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "---" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "╔════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
-        echo "║            Test Results                ║" >> $GITHUB_STEP_SUMMARY
-        echo "╠════════════════════════════════════════╣" >> $GITHUB_STEP_SUMMARY
+      - name: Prepare results file path
+        if: always()
+        run: |
+          echo "RESULTS_FILE=$RUNNER_TEMP/autograde-results.b64" >> "$GITHUB_ENV"
+          : > "$RUNNER_TEMP/autograde-results.b64"
 
-        # ASCII results (no arrays, just repeat for each test)
-        test_name="compile via make"
-        result="$COMPILE_RESULT"
-        case "$result" in
-          *✓*|success)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-          *)
-            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-        esac
+      # --- Compile test (from original) ---
+      - name: compile via make
+        id: compile-make
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: compile
+          setup-command: make
+          command: test -f tester
+          timeout: 4
+          max-score: 0
+      - name: Record result (compile)
+        if: always()
+        run: |
+          [ -n "${{ steps.compile-make.outputs.result }}" ] && \
+          echo "${{ steps.compile-make.outputs.result }}" >> "$RESULTS_FILE" || true
 
-        test_name="step1"
-        result="$STEP1_RESULT"
-        case "$result" in
-          *✓*|success)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-          *)
-            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-        esac
+      # --- Step 1 ---
+      - name: step1
+        id: step1
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: step1
+          command: "./tester step1"
+          timeout: 10
+          max-score: 1
+      - name: Record result (step1)
+        if: always()
+        run: |
+          [ -n "${{ steps.step1.outputs.result }}" ] && \
+          echo "${{ steps.step1.outputs.result }}" >> "$RESULTS_FILE" || true
 
-        test_name="step2"
-        result="$STEP2_RESULT"
-        case "$result" in
-          *✓*|success)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-          *)
-            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-        esac
+      # --- Step 2 ---
+      - name: step2
+        id: step2
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: step2
+          command: "./tester step2"
+          timeout: 10
+          max-score: 1
+      - name: Record result (step2)
+        if: always()
+        run: |
+          [ -n "${{ steps.step2.outputs.result }}" ] && \
+          echo "${{ steps.step2.outputs.result }}" >> "$RESULTS_FILE" || true
 
-        test_name="step3"
-        result="$STEP3_RESULT"
-        case "$result" in
-          *✓*|success)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-          *)
-            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-        esac
+      # --- Step 3 ---
+      - name: step3
+        id: step3
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: step3
+          command: "./tester step3"
+          timeout: 10
+          max-score: 1
+      - name: Record result (step3)
+        if: always()
+        run: |
+          [ -n "${{ steps.step3.outputs.result }}" ] && \
+          echo "${{ steps.step3.outputs.result }}" >> "$RESULTS_FILE" || true
 
-        test_name="step4"
-        result="$STEP4_RESULT"
-        case "$result" in
-          *✓*|success)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-          *)
-            printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
-            ;;
-        esac
-        
-        echo "╚════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+      # --- Step 4 ---
+      - name: step4
+        id: step4
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: step4
+          command: "./tester step4"
+          timeout: 10
+          max-score: 1
+      - name: Record result (step4)
+        if: always()
+        run: |
+          [ -n "${{ steps.step4.outputs.result }}" ] && \
+          echo "${{ steps.step4.outputs.result }}" >> "$RESULTS_FILE" || true
+
+      # --- Final summary step ---
+      - name: Summarize autograding results & decide pass/fail
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SUMMARY="$RUNNER_TEMP/autograde-summary.md"
+          : > "$SUMMARY"
+
+          decode() { echo "$1" | base64 -d; }
+          one_line() { tr -d '\n' | tr -d '\r'; }
+
+          # parse_blob <base64> -> "name|prettyStatus|score|max|message|rawStatus"
+          parse_blob() {
+            local blob="$1"
+            local json onel test status raw score max message name
+            json="$(decode "$blob" 2>/dev/null || true)"
+            onel="$(echo "$json" | one_line)"
+            # Actions emit a single test per blob
+            test="$(echo "$onel" | sed -E 's/.*"tests":[[]\{([^]]*)\}[]].*/{\1}/')"
+
+            name="$(   echo "$test" | sed -E 's/.*"name":"([^"]*)".*/\1/')" || true
+            raw="$(    echo "$test" | sed -E 's/.*"status":"([^"]*)".*/\1/')" || true
+            score="$(  echo "$test" | sed -E 's/.*"score":([0-9]+).*/\1/')"  || true
+            max="$(    echo "$onel" | sed -E 's/.*"max_score":([0-9]+).*/\1/')" || true
+            message="$(echo "$test" | sed -E 's/.*"message":"([^"]*)".*/\1/')" || true
+
+            case "$raw" in
+              pass) status="✅ Pass" ;;
+              fail) status="❌ Fail" ;;
+              *)    status="⚠️ Unknown" ;;
+            esac
+
+            # For compile test, show a student-friendly message
+            if [ "$name" = "compile" ]; then
+              if [ "$raw" = "pass" ]; then
+                message="Compiled successfully."
+              else
+                # If message is empty, show a generic error
+                if [ -z "$message" ]; then
+                  message="Compilation failed."
+                fi
+              fi
+            fi
+
+            # keep the table intact
+            message="${message//|/\\|}"
+
+            echo "${name:-(unnamed)}|${status}|${score:-0}|${max:-0}|${message}|${raw:-unknown}"
+          }
+
+          # Prepare markdown table for summary and ASCII table for logs
+          {
+            echo "## Autograding results"
+            echo
+            echo "| Test | Status | Points | Message |"
+            echo "|---|---:|---:|---|"
+          } >> "$SUMMARY"
+
+          # Print ASCII table header for logs
+          ascii_border='+----------------+----------+--------+------------------------------------------+'
+          printf "\n===================== AUTOGRADING RESULTS =====================\n"
+          printf "$ascii_border\n"
+          printf "| %-14s | %-8s | %-6s | %-40s |\n" "Test" "Status" "Points" "Message"
+          printf "$ascii_border\n"
+
+          tot_score=0
+          tot_max=0
+          any_fail=0
+
+          if [ -f "$RESULTS_FILE" ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+              [ -z "$line" ] && continue
+              parsed="$(parse_blob "$line")"
+              IFS='|' read -r name status score max message raw <<<"$parsed"
+              # Markdown for summary
+              echo "| ${name} | ${status} | ${score}/${max} | ${message} |" >> "$SUMMARY"
+              # ASCII for logs (truncate message for log width)
+              short_msg="${message:0:40}"
+              points_col="${score}/${max}"
+              printf "| %-14s | %-8s | %-6s | %-40s |\n" "$name" "$status" "$points_col" "$short_msg"
+              tot_score=$((tot_score + ${score:-0}))
+              tot_max=$((tot_max + ${max:-0}))
+              [ "${raw:-unknown}" = "fail" ] && any_fail=1
+            done < "$RESULTS_FILE"
+            printf "$ascii_border\n"
+          else
+            echo "_No results recorded (RESULTS_FILE not found)_" >> "$SUMMARY"
+            printf "| %-76s |\n" "No results recorded (RESULTS_FILE not found)"
+            printf "+---------------------------------------------------------------------------------+\n"
+          fi
+
+          {
+            echo
+            if [ "$tot_score" -eq "$tot_max" ] && [ "$tot_max" -gt 0 ]; then
+              echo "🎉 **Score:** ${tot_score}/${tot_max}"
+            else
+              echo "📊 **Score:** ${tot_score}/${tot_max}"
+            fi
+          } >> "$SUMMARY"
+
+          # Print markdown summary to Job Summary
+          echo
+          echo "==============================================================="
+          echo
+          cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+
+          # Fail here (single, clean failure)
+          if [ "$any_fail" -ne 0 ]; then
+            echo "::error::Autograding failed: one or more tests did not match the expected output. The full summary is shown above."
+            exit 1
+          fi
