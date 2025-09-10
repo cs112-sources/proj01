@@ -59,6 +59,12 @@ jobs:
         max-score: 1
     - name: Create Summary
       id: summary
+      env:
+        COMPILE_RESULT: ${{ steps.compile-make.outputs.result }}
+        STEP1_RESULT: ${{ steps.step1.outputs.result }}
+        STEP2_RESULT: ${{ steps.step2.outputs.result }}
+        STEP3_RESULT: ${{ steps.step3.outputs.result }}
+        STEP4_RESULT: ${{ steps.step4.outputs.result }}
       run: |
         echo "## Autograding Results" >> $GITHUB_STEP_SUMMARY
         echo "| Test | Status | Score |" >> $GITHUB_STEP_SUMMARY
@@ -81,12 +87,12 @@ jobs:
         }
 
         # Process each test (no arrays)
-        process_result "compile via make" "${{ steps.compile-make.outputs.result }}"
-        process_result "step1" "${{ steps.step1.outputs.result }}"
-        process_result "step2" "${{ steps.step2.outputs.result }}"
-        process_result "step3" "${{ steps.step3.outputs.result }}"
-        process_result "step4" "${{ steps.step4.outputs.result }}"
-        
+        process_result "compile via make" "$COMPILE_RESULT"
+        process_result "step1" "$STEP1_RESULT"
+        process_result "step2" "$STEP2_RESULT"
+        process_result "step3" "$STEP3_RESULT"
+        process_result "step4" "$STEP4_RESULT"
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -94,10 +100,10 @@ jobs:
         echo "╔════════════════════════════════════════╗" >> $GITHUB_STEP_SUMMARY
         echo "║            Test Results                ║" >> $GITHUB_STEP_SUMMARY
         echo "╠════════════════════════════════════════╣" >> $GITHUB_STEP_SUMMARY
-        
+
         # ASCII results (no arrays, just repeat for each test)
         test_name="compile via make"
-        result="${{ steps.compile-make.outputs.result }}"
+        result="$COMPILE_RESULT"
         case "$result" in
           *✓*|success)
             printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
@@ -108,7 +114,7 @@ jobs:
         esac
 
         test_name="step1"
-        result="${{ steps.step1.outputs.result }}"
+        result="$STEP1_RESULT"
         case "$result" in
           *✓*|success)
             printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
@@ -119,7 +125,7 @@ jobs:
         esac
 
         test_name="step2"
-        result="${{ steps.step2.outputs.result }}"
+        result="$STEP2_RESULT"
         case "$result" in
           *✓*|success)
             printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
@@ -130,7 +136,7 @@ jobs:
         esac
 
         test_name="step3"
-        result="${{ steps.step3.outputs.result }}"
+        result="$STEP3_RESULT"
         case "$result" in
           *✓*|success)
             printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
@@ -141,7 +147,7 @@ jobs:
         esac
 
         test_name="step4"
-        result="${{ steps.step4.outputs.result }}"
+        result="$STEP4_RESULT"
         case "$result" in
           *✓*|success)
             printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
