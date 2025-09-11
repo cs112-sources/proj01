@@ -70,19 +70,39 @@ jobs:
           result="$2"
           icon="❌"
           status="FAILED"
+          score="0"
+          max_score="1"
           
-          # Decode base64 and check for "status":"pass"
+          # Decode base64 and analyze the result
           decoded_result=$(echo "$result" | base64 -d 2>/dev/null || echo "")
+          
+          # Extract basic info
+          raw_score=$(echo "$decoded_result" | grep -o '"score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+          max_score=$(echo "$decoded_result" | grep -o '"max_score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '1')
+          
           case "$decoded_result" in
             *'"status":"pass"'*)
-              icon="✅"
-              status="PASSED"
+              # Run the actual test to check its output
+              if [ "$test_name" = "compile via make" ]; then
+                icon="✅"; status="PASSED"; score="$raw_score"
+              else
+                # Run the test and capture output to detect empty tests
+                test_output=$(./tester "$test_name" 2>&1 || echo "")
+                if echo "$test_output" | grep -q "assertions: - none -"; then
+                  icon="⚪"; status="NO TESTS"; score="0"
+                else
+                  icon="✅"; status="PASSED"; score="$raw_score"
+                fi
+              fi
+              ;;
+            *)
+              # Test failed - this means there are real assertions
+              icon="❌"
+              status="FAILED"
+              score="0"
               ;;
           esac
           
-          # Extract score from JSON or default to 0/1
-          score=$(echo "$decoded_result" | grep -o '"score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
-          max_score=$(echo "$decoded_result" | grep -o '"max_score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '1')
           echo "| $test_name | $icon $status | $score/$max_score |" >> "$GITHUB_STEP_SUMMARY"
         }
 
@@ -93,6 +113,102 @@ jobs:
         process_result "step3" "${{ steps.step3.outputs.result }}"
         process_result "step4" "${{ steps.step4.outputs.result }}"
         
+        # Calculate total score with file-based NO TESTS detection
+        total_score=0
+        total_max=0
+        
+        # Process compile-make (always count this)
+        decoded=$(echo "${{ steps.compile-make.outputs.result }}" | base64 -d 2>/dev/null || echo "")
+        raw_score=$(echo "$decoded" | grep -o '"score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        max_score=$(echo "$decoded" | grep -o '"max_score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        case "$decoded" in
+          *'"status":"pass"'*)
+            total_score=$((total_score + raw_score))
+            ;;
+          *)
+            total_score=$((total_score + 0))
+            ;;
+        esac
+        total_max=$((total_max + max_score))
+        
+        # Process step1
+        decoded=$(echo "${{ steps.step1.outputs.result }}" | base64 -d 2>/dev/null || echo "")
+        raw_score=$(echo "$decoded" | grep -o '"score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        max_score=$(echo "$decoded" | grep -o '"max_score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        case "$decoded" in
+          *'"status":"pass"'*)
+            test_output=$(./tester step1 2>&1 || echo "")
+            if echo "$test_output" | grep -q "assertions: - none -"; then
+              total_score=$((total_score + 0))  # NO TESTS = 0
+            else
+              total_score=$((total_score + raw_score))  # PASSED = actual score
+            fi
+            ;;
+          *)
+            total_score=$((total_score + 0))  # FAILED = 0
+            ;;
+        esac
+        total_max=$((total_max + max_score))
+        
+        # Process step2
+        decoded=$(echo "${{ steps.step2.outputs.result }}" | base64 -d 2>/dev/null || echo "")
+        raw_score=$(echo "$decoded" | grep -o '"score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        max_score=$(echo "$decoded" | grep -o '"max_score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        case "$decoded" in
+          *'"status":"pass"'*)
+            test_output=$(./tester step2 2>&1 || echo "")
+            if echo "$test_output" | grep -q "assertions: - none -"; then
+              total_score=$((total_score + 0))  # NO TESTS = 0
+            else
+              total_score=$((total_score + raw_score))  # PASSED = actual score
+            fi
+            ;;
+          *)
+            total_score=$((total_score + 0))  # FAILED = 0
+            ;;
+        esac
+        total_max=$((total_max + max_score))
+        
+        # Process step3
+        decoded=$(echo "${{ steps.step3.outputs.result }}" | base64 -d 2>/dev/null || echo "")
+        raw_score=$(echo "$decoded" | grep -o '"score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        max_score=$(echo "$decoded" | grep -o '"max_score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        case "$decoded" in
+          *'"status":"pass"'*)
+            test_output=$(./tester step3 2>&1 || echo "")
+            if echo "$test_output" | grep -q "assertions: - none -"; then
+              total_score=$((total_score + 0))  # NO TESTS = 0
+            else
+              total_score=$((total_score + raw_score))  # PASSED = actual score
+            fi
+            ;;
+          *)
+            total_score=$((total_score + 0))  # FAILED = 0
+            ;;
+        esac
+        total_max=$((total_max + max_score))
+        
+        # Process step4
+        decoded=$(echo "${{ steps.step4.outputs.result }}" | base64 -d 2>/dev/null || echo "")
+        raw_score=$(echo "$decoded" | grep -o '"score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        max_score=$(echo "$decoded" | grep -o '"max_score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+        case "$decoded" in
+          *'"status":"pass"'*)
+            test_output=$(./tester step4 2>&1 || echo "")
+            if echo "$test_output" | grep -q "assertions: - none -"; then
+              total_score=$((total_score + 0))  # NO TESTS = 0
+            else
+              total_score=$((total_score + raw_score))  # PASSED = actual score
+            fi
+            ;;
+          *)
+            total_score=$((total_score + 0))  # FAILED = 0
+            ;;
+        esac
+        total_max=$((total_max + max_score))
+        
+        echo "| **TOTAL** | 🎯 | **$total_score/$total_max** |" >> "$GITHUB_STEP_SUMMARY"
+        
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -101,13 +217,19 @@ jobs:
         echo "║            Test Results                ║" >> $GITHUB_STEP_SUMMARY
         echo "╠════════════════════════════════════════╣" >> $GITHUB_STEP_SUMMARY
         
-        # ASCII results (no arrays, just repeat for each test)
+        # ASCII results - same logic as table
         test_name="compile via make"
         result="${{ steps.compile-make.outputs.result }}"
         decoded_result=$(echo "$result" | base64 -d 2>/dev/null || echo "")
         case "$decoded_result" in
           *'"status":"pass"'*)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            raw_score=$(echo "$decoded_result" | grep -o '"score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '0')
+            max_score=$(echo "$decoded_result" | grep -o '"max_score":[0-9]*' | head -1 | grep -o '[0-9]*' || echo '1')
+            if [ "$raw_score" = "$max_score" ] && [ "$max_score" = "1" ] && echo "$decoded_result" | grep -q '(0 assertions'; then
+              printf "║ %-30s [N/A ] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            fi
             ;;
           *)
             printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
@@ -119,7 +241,12 @@ jobs:
         decoded_result=$(echo "$result" | base64 -d 2>/dev/null || echo "")
         case "$decoded_result" in
           *'"status":"pass"'*)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            test_output=$(./tester step1 2>&1 || echo "")
+            if echo "$test_output" | grep -q "assertions: - none -"; then
+              printf "║ %-30s [N/A ] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            fi
             ;;
           *)
             printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
@@ -131,7 +258,12 @@ jobs:
         decoded_result=$(echo "$result" | base64 -d 2>/dev/null || echo "")
         case "$decoded_result" in
           *'"status":"pass"'*)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            test_content=$(grep -A 20 'TEST_CASE("step2")' tests.cpp 2>/dev/null || echo "")
+            if echo "$test_content" | grep -v '^[[:space:]]*\(//\|#\)' | grep -q "REQUIRE\|CHECK\|SECTION"; then
+              printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf "║ %-30s [N/A ] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            fi
             ;;
           *)
             printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
@@ -143,7 +275,12 @@ jobs:
         decoded_result=$(echo "$result" | base64 -d 2>/dev/null || echo "")
         case "$decoded_result" in
           *'"status":"pass"'*)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            test_content=$(grep -A 20 'TEST_CASE("step3")' tests.cpp 2>/dev/null || echo "")
+            if echo "$test_content" | grep -v '^[[:space:]]*\(//\|#\)' | grep -q "REQUIRE\|CHECK\|SECTION"; then
+              printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf "║ %-30s [N/A ] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            fi
             ;;
           *)
             printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
@@ -155,12 +292,21 @@ jobs:
         decoded_result=$(echo "$result" | base64 -d 2>/dev/null || echo "")
         case "$decoded_result" in
           *'"status":"pass"'*)
-            printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            test_content=$(grep -A 20 'TEST_CASE("step4")' tests.cpp 2>/dev/null || echo "")
+            if echo "$test_content" | grep -v '^[[:space:]]*\(//\|#\)' | grep -q "REQUIRE\|CHECK\|SECTION"; then
+              printf "║ %-30s [PASS] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            else
+              printf "║ %-30s [N/A ] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
+            fi
             ;;
           *)
             printf "║ %-30s [FAIL] ║\n" "$test_name" >> "$GITHUB_STEP_SUMMARY"
             ;;
         esac
+        
+        # Add total score to ASCII display
+        echo "╠════════════════════════════════════════╣" >> $GITHUB_STEP_SUMMARY
+        printf "║ %-22s TOTAL: %s/%s ║\n" "" "$total_score" "$total_max" >> "$GITHUB_STEP_SUMMARY"
         
         echo "╚════════════════════════════════════════╝" >> $GITHUB_STEP_SUMMARY
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
